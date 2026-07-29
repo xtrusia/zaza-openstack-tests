@@ -531,17 +531,31 @@ def get_aodh_session_client(session):
     return aodh_client.Client(session=session)
 
 
-def get_manila_session_client(session, version='2'):
+def get_manila_session_client(session, version='2', model_name=None):
     """Return Manila client authenticated by keystone session.
 
     :param session: Keystone session object
     :type session: keystoneauth1.session.Session object
     :param version: Manila API version
     :type version: str
+    :param model_name: Optional model name to get the client for
+    :type model_name: str
     :returns: Authenticated manilaclient
     :rtype: manilaclient.Client
     """
-    return manilaclient.Client(session=session, client_version=version)
+    tls_rid = model.get_relation_id(
+        'manila', 'vault', model_name=model_name,
+        remote_interface_name='certificates')
+    ssl_config = get_application_config_option(
+        'manila', 'ssl_cert', model_name=model_name)
+    client_options = {}
+    if tls_rid or ssl_config:
+        cacert = get_cacert()
+        if cacert:
+            client_options['cacert'] = cacert
+
+    return manilaclient.Client(
+        session=session, client_version=version, **client_options)
 
 
 def get_watcher_session_client(session):

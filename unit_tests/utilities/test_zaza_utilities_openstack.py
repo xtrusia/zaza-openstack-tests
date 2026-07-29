@@ -303,6 +303,45 @@ class TestOpenStackUtils(ut_utils.BaseTestCase):
         openstack_utils.get_nova_session_client(session_mock, version=2.56)
         self.Client.assert_called_once_with(2.56, session=session_mock)
 
+    def test_get_manila_session_client_without_tls(self):
+        session_mock = mock.MagicMock()
+        self.patch_object(openstack_utils.manilaclient, "Client")
+        self.patch_object(openstack_utils.model, "get_relation_id")
+        self.patch_object(
+            openstack_utils, "get_application_config_option")
+        self.patch_object(openstack_utils, "get_cacert")
+        self.get_relation_id.return_value = None
+        self.get_application_config_option.return_value = None
+
+        openstack_utils.get_manila_session_client(
+            session_mock, version='2.90', model_name='test-model')
+
+        self.get_relation_id.assert_called_once_with(
+            'manila', 'vault', model_name='test-model',
+            remote_interface_name='certificates')
+        self.get_application_config_option.assert_called_once_with(
+            'manila', 'ssl_cert', model_name='test-model')
+        self.get_cacert.assert_not_called()
+        self.Client.assert_called_once_with(
+            session=session_mock, client_version='2.90')
+
+    def test_get_manila_session_client_with_tls(self):
+        session_mock = mock.MagicMock()
+        self.patch_object(openstack_utils.manilaclient, "Client")
+        self.patch_object(openstack_utils.model, "get_relation_id")
+        self.patch_object(
+            openstack_utils, "get_application_config_option")
+        self.patch_object(openstack_utils, "get_cacert")
+        self.get_relation_id.return_value = 'certificates:1'
+        self.get_application_config_option.return_value = None
+        self.get_cacert.return_value = '/tmp/manila-ca.crt'
+
+        openstack_utils.get_manila_session_client(session_mock)
+
+        self.Client.assert_called_once_with(
+            session=session_mock, client_version='2',
+            cacert='/tmp/manila-ca.crt')
+
     def test_get_urllib_opener(self):
         self.patch_object(openstack_utils.urllib.request, "ProxyHandler")
         self.patch_object(openstack_utils.urllib.request, "HTTPHandler")
